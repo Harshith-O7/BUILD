@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && isVerified() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'selfmemy87@gmail.com'
+      );
+    }
+
+    function isValidWorkspace(data, userId) {
+      return data.keys().hasAll(['ownerId', 'companyName', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'companyName', 'updatedAt'])
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.companyName is string
+        && data.companyName.size() > 0
+        && data.companyName.size() <= 150
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkspaceEntity(data, userId, recordId) {
+      return data.keys().hasAll(['id', 'ownerId', 'entityType', 'payload', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'ownerId', 'entityType', 'payload', 'createdAt', 'updatedAt'])
+        && data.id is string
+        && isValidId(data.id)
+        && data.id == recordId
+        && data.ownerId is string
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.entityType is string
+        && data.entityType.size() > 0
+        && data.entityType.size() <= 64
+        && data.entityType in [
+          'project', 'task', 'employee', 'equipment', 'material',
+          'expense', 'incident', 'inspection', 'report', 'document',
+          'notification', 'teamMember', 'activity', 'settings'
+        ]
+        && data.payload is map
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isVerified() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    match /workspaces/{userId} {
+      allow get: if isSignedIn() && isVerified() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isSignedIn() && isVerified() && (isAdmin() || resource.data.ownerId == request.auth.uid);
+      allow create: if isSignedIn()
+        && isVerified()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidWorkspace(incoming(), userId)
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isVerified()
+        && isValidId(userId)
+        && (request.auth.uid == userId || isAdmin())
+        && isValidWorkspace(incoming(), userId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['companyName', 'updatedAt'])
+        && incoming().ownerId == existing().ownerId
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(userId);
+
+      match /records/{recordId} {
+        allow get: if isSignedIn() && isVerified() && isValidId(userId) && isValidId(recordId) && (request.auth.uid == userId || isAdmin());
+        allow list: if isSignedIn() && isVerified() && (isAdmin() || resource.data.ownerId == request.auth.uid);
+        allow create: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(recordId)
+          && (request.auth.uid == userId || isAdmin())
+          && isValidWorkspaceEntity(incoming(), userId, recordId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/workspaces/$(userId));
+        allow update: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(recordId)
+          && (request.auth.uid == userId || isAdmin())
+          && isValidWorkspaceEntity(incoming(), userId, recordId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['payload', 'updatedAt'])
+          && incoming().id == existing().id
+          && incoming().ownerId == existing().ownerId
+          && incoming().entityType == existing().entityType
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time;
+        allow delete: if isSignedIn()
+          && isVerified()
+          && isValidId(userId)
+          && isValidId(recordId)
+          && (request.auth.uid == userId || isAdmin());
+      }
+    }
+  }
+}

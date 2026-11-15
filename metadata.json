@@ -1,0 +1,6 @@
+{
+  "name": "BuildGrid - Construction Site Management Dashboard",
+  "description": "Enterprise Construction Site Management Dashboard for project tracking, site progress, workforce, equipment, material inventory, budgets in INR, safety compliance, and daily site reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

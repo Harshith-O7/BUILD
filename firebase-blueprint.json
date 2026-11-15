@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "Workspace": {
+      "title": "Workspace",
+      "description": "User workspace root containing construction management preferences and ownership metadata.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "companyName": { "type": "string", "maxLength": 150 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "companyName", "updatedAt"]
+    },
+    "WorkspaceEntity": {
+      "title": "WorkspaceEntity",
+      "description": "Generic persisted construction management record (project, task, employee, equipment, material, expense, incident, report, document, notification, settings).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "entityType": { "type": "string", "maxLength": 64 },
+        "payload": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "ownerId", "entityType", "payload", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/workspaces/{userId}": {
+      "schema": { "$ref": "#/entities/Workspace" },
+      "description": "Root workspace metadata owned by a specific authenticated user."
+    },
+    "/workspaces/{userId}/records/{recordId}": {
+      "schema": { "$ref": "#/entities/WorkspaceEntity" },
+      "description": "Typed construction management records belonging to the user workspace."
+    }
+  }
+}
